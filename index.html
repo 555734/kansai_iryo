@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KUMA-RIDE | 関西医療大学・通学改革プロジェクト</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap');
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #00A693 0%, #00796B 100%);
+        }
+        .vote-card {
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+        .vote-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .vote-radio:checked + div {
+            border-color: #00A693;
+            background-color: #F0FDFA;
+            position: relative;
+        }
+        .vote-radio:checked + div::after {
+            content: "\f00c";
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #00A693;
+            font-size: 1.2rem;
+        }
+        /* ゴール達成に向けたプログレスバーのアニメーション */
+        @keyframes shimmer {
+            0% { background-position: -1000px 0; }
+            100% { background-position: 1000px 0; }
+        }
+        .shimmer-effect {
+            animation: shimmer 2s infinite linear;
+            background: linear-gradient(to right, #10B981 4%, #34D399 25%, #10B981 36%);
+            background-size: 1000px 100%;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 antialiased">
+
+    <!-- Bandwagon Effect (Goal Oriented) -->
+    <!-- 嘘の数字ではなく「目標」を提示し、参加する意義を持たせる -->
+    <div class="bg-gray-900 text-white text-xs py-3 text-center sticky top-0 z-50 shadow-md">
+        <div class="max-w-md mx-auto px-4 flex justify-between items-center">
+            <span class="font-bold text-yellow-400"><i class="fa-solid fa-flag"></i> 交渉開始まで</span>
+            <div class="flex-1 mx-3 h-2 bg-gray-700 rounded-full overflow-hidden">
+                <div class="h-full w-1/4 shimmer-effect rounded-full"></div>
+            </div>
+            <span class="font-bold">目標 300人</span>
+        </div>
+    </div>
+
+    <!-- Hero Section -->
+    <header class="relative pt-16 pb-24 px-4 text-center bg-white overflow-hidden">
+        <div class="max-w-md mx-auto relative z-10">
+            <div class="inline-block py-1 px-3 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold mb-6 tracking-wide border border-emerald-200">
+                関西医療大学 学生有志プロジェクト
+            </div>
+            
+            <h1 class="text-3xl font-black leading-tight mb-6">
+                あなたは4年間で、<br>
+                <span class="text-4xl bg-clip-text text-transparent bg-gradient-to-r from-red-600 to-pink-600">約240時間</span>を<br>
+                バス停で捨てますか？
+            </h1>
+
+            <p class="text-gray-600 mb-8 font-medium">
+                「バスが来ない」「行列が長い」...<br>
+                そのストレス、私たちで終わらせませんか？
+            </p>
+
+            <a href="#vote-section" class="inline-block bg-emerald-600 text-white font-bold text-lg px-8 py-4 rounded-full shadow-lg hover:bg-emerald-700 transition transform hover:scale-105 group">
+                賛同して投票する
+                <i class="fa-solid fa-arrow-down ml-2 group-hover:translate-y-1 transition"></i>
+            </a>
+        </div>
+
+        <!-- Decorative Background -->
+        <div class="absolute top-0 left-0 w-full h-full z-0 opacity-10 pointer-events-none">
+            <i class="fa-solid fa-bus text-9xl absolute -left-10 top-20 text-gray-400"></i>
+            <i class="fa-solid fa-bicycle text-9xl absolute -right-10 bottom-20 text-emerald-200"></i>
+        </div>
+    </header>
+
+    <!-- Context (In-group Bias) -->
+    <section class="py-12 bg-emerald-50 px-4">
+        <div class="max-w-md mx-auto">
+            <div class="flex items-center justify-center mb-6">
+                <i class="fa-solid fa-heart-pulse text-emerald-600 text-3xl mr-3"></i>
+                <h2 class="text-xl font-bold text-emerald-900">未来の医療人の時間を作る</h2>
+            </div>
+            <p class="text-sm text-center text-gray-700 leading-relaxed mb-6">
+                国家試験の勉強、アルバイト、休息。<br>
+                医療を目指す私たちにとって、時間は最も貴重な資源です。<br>
+                <span class="font-bold">KUMA-RIDE</span>は、関西医療大学の仲間のためにデザインされた、専用シェアサイクル構想です。
+            </p>
+        </div>
+    </section>
+
+    <!-- Comparison (Loss Aversion) -->
+    <section class="py-12 px-4 bg-white">
+        <div class="max-w-md mx-auto">
+            <h2 class="text-center font-bold text-xl mb-8">「選ばない」ことの損失</h2>
+            
+            <div class="flex gap-2">
+                <!-- Current Situation (Loss) -->
+                <div class="flex-1 bg-gray-50 rounded-xl p-4 border border-gray-200">
+                    <h3 class="text-center font-bold text-gray-500 text-sm mb-4">今の通学スタイル</h3>
+                    <ul class="text-xs space-y-3">
+                        <li class="flex items-start">
+                            <i class="fa-solid fa-triangle-exclamation text-yellow-500 mt-1 mr-2"></i>
+                            <span class="text-gray-500">年間 <span class="font-bold text-red-500">60時間</span>の無駄</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fa-solid fa-triangle-exclamation text-yellow-500 mt-1 mr-2"></i>
+                            <span class="text-gray-500">遅延のリスクとストレス</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- New Proposal (Gain) -->
+                <div class="flex-1 bg-white rounded-xl p-4 border-2 border-emerald-500 shadow-xl relative overflow-hidden">
+                    <div class="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] px-2 py-1 font-bold">New</div>
+                    <h3 class="text-center font-bold text-emerald-700 text-sm mb-4">KUMA-RIDE導入後</h3>
+                    <ul class="text-xs space-y-3">
+                        <li class="flex items-start">
+                            <i class="fa-solid fa-check text-emerald-500 mt-1 mr-2"></i>
+                            <span class="font-bold">待ち時間 ゼロ</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fa-solid fa-check text-emerald-500 mt-1 mr-2"></i>
+                            <span>駅に着いたら即出発</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Founder Message (Authority & Storytelling) -->
+    <!-- 井上君の個人名を出すことで、責任感と本気度を伝える -->
+    <section class="py-10 px-4 bg-white">
+        <div class="max-w-md mx-auto bg-gray-50 rounded-2xl p-6 border-l-4 border-emerald-500 relative">
+            <i class="fa-solid fa-quote-left absolute top-4 left-4 text-emerald-200 text-4xl -z-10"></i>
+            <h3 class="font-bold text-sm text-gray-800 mb-3">発起人からのメッセージ</h3>
+            <p class="text-xs text-gray-600 leading-relaxed mb-4">
+                「なんでこんなにバスを待たなきゃいけないんだろう？」<br>
+                毎朝の通学で感じていた素朴な疑問が、このプロジェクトの始まりです。<br>
+                <br>
+                このサービスを実現するには、大学や企業への交渉が必要です。「これだけの学生が求めている」という証拠（データ）が、最強の武器になります。<br>
+                あなたの1票を、僕たちに預けてください。
+            </p>
+            <div class="flex items-center justify-end">
+                <div class="text-right">
+                    <p class="font-bold text-sm text-emerald-800">井上 拓海</p>
+                    <p class="text-[10px] text-gray-500">KUMA-RIDE 代表 / 関西医療大学 在学生</p>
+                </div>
+                <!-- User Icon Placeholder -->
+                <div class="ml-3 w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-white">
+                    <i class="fa-solid fa-user"></i>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Vote Section (Choice Architecture) -->
+    <section id="vote-section" class="py-16 px-4 gradient-bg text-white relative">
+        <div class="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+        
+        <div class="max-w-md mx-auto relative z-10">
+            <h2 class="text-2xl font-bold text-center mb-4">
+                <span class="border-b-4 border-yellow-400">実現に向けた意思表示をお願いします</span>
+            </h2>
+            <p class="text-center text-emerald-50 mb-8 text-sm">
+                この投票数が300を超えた段階で、交渉を開始します。<br>
+                もし利用できるとしたら、どのプランを希望しますか？
+            </p>
+
+            <form class="space-y-4" onsubmit="handleVote(event)">
+                
+                <!-- Option 1: High Anchor -->
+                <label class="block cursor-pointer group">
+                    <input type="radio" name="plan" value="premium" class="vote-radio hidden">
+                    <div class="vote-card bg-white text-gray-800 p-5 rounded-xl border-4 border-transparent hover:border-emerald-200">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-bold text-lg text-emerald-800">電動アシスト確約</span>
+                            <span class="bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded">台数限定</span>
+                        </div>
+                        <div class="text-2xl font-bold mb-1">
+                            月額 4,500円
+                            <span class="text-xs text-gray-500 font-normal ml-1">（1日約220円）</span>
+                        </div>
+                        <p class="text-xs text-gray-500">
+                            坂道も楽々。バス定期代と同等の投資で、時間を買いたい方へ。
+                        </p>
+                    </div>
+                </label>
+
+                <!-- Option 2: Target (Decoy Effect) -->
+                <label class="block cursor-pointer group">
+                    <input type="radio" name="plan" value="standard" class="vote-radio hidden" checked>
+                    <div class="vote-card bg-white text-gray-800 p-5 rounded-xl border-4 border-emerald-400 shadow-2xl scale-105 relative z-20">
+                        <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-emerald-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-md">
+                            スタンダード
+                        </div>
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-bold text-lg text-emerald-800">通い放題プラン</span>
+                        </div>
+                        <div class="text-3xl font-black text-emerald-600 mb-1">
+                            月額 3,000円
+                            <span class="text-xs text-gray-500 font-normal ml-1">（1日たった150円）</span>
+                        </div>
+                        <p class="text-xs text-gray-600 font-bold">
+                            ジュース1本分の値段で、毎日の行列から解放されます。
+                        </p>
+                    </div>
+                </label>
+
+                <!-- Option 3: Low Commitment -->
+                <label class="block cursor-pointer group">
+                    <input type="radio" name="plan" value="payg" class="vote-radio hidden">
+                    <div class="vote-card bg-white text-gray-800 p-5 rounded-xl border-4 border-transparent hover:border-emerald-200">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-bold text-lg text-gray-700">都度払い</span>
+                        </div>
+                        <div class="text-xl font-bold mb-1">
+                            1回 150円〜
+                        </div>
+                        <p class="text-xs text-gray-500">
+                            雨の日以外や、急いでいる時だけ使いたい方向け。
+                        </p>
+                    </div>
+                </label>
+
+                <!-- Option 4: Negative Frame (Nudge) -->
+                <label class="block cursor-pointer mt-6 opacity-60 hover:opacity-100 transition">
+                    <input type="radio" name="plan" value="none" class="hidden">
+                    <div class="text-center p-3 border border-emerald-300/30 rounded-lg hover:bg-emerald-800/20">
+                        <span class="text-xs text-emerald-100">
+                            結構です。私は現状のバス通学を続けます。
+                        </span>
+                    </div>
+                </label>
+
+                <button type="submit" class="w-full bg-yellow-400 text-yellow-900 font-black text-xl py-4 rounded-xl shadow-lg hover:bg-yellow-300 transform active:scale-95 transition mt-6 flex items-center justify-center">
+                    <span>この内容で署名する</span>
+                    <i class="fa-solid fa-pen-nib ml-2"></i>
+                </button>
+            </form>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-gray-400 py-10 text-center px-4 text-xs">
+        <div class="max-w-md mx-auto border-t border-gray-800 pt-8">
+            <h4 class="font-bold text-gray-300 mb-4 text-sm">KUMA-RIDE Project Team</h4>
+            <div class="mb-6 space-y-1">
+                <p>Leader: 井上 拓海</p>
+                <p>Support: 関西医療大学 有志メンバー</p>
+            </div>
+            <p class="opacity-50">※本プロジェクトは学生有志による企画であり、大学公式の事業ではありません。</p>
+            <p class="opacity-50 mt-2">&copy; 2024 KUMA-RIDE Project</p>
+        </div>
+    </footer>
+
+    <!-- Firebase SDKの読み込み -->
+    <script type="module">
+        // ---------------------------------------------------------
+        // 重要: ここにあなたのFirebase設定を貼り付けます
+        // ---------------------------------------------------------
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // ★★★ 下記の値をFirebaseコンソールから取得して書き換えてください ★★★
+        const firebaseConfig = {
+            apiKey: "AIzaSy...",            // あなたのAPI Key
+            authDomain: "...",              // あなたのAuth Domain
+            projectId: "...",               // あなたのProject ID
+            storageBucket: "...",
+            messagingSenderId: "...",
+            appId: "..."
+        };
+
+        // Firebaseの初期化
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // グローバルスコープで使えるように関数をwindowに登録
+        window.handleVote = async function(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const plan = formData.get('plan');
+            
+            // 否定的な選択肢への確認ダイアログ
+            if (plan === 'none') {
+                if(!confirm('本当に現状維持でよろしいですか？\nこのプロジェクトは皆様の声だけが頼りです。\nよろしければ、プランを選んで応援していただけませんか？')) {
+                    return;
+                }
+            }
+
+            const btn = e.target.querySelector('button');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> 送信中...';
+            btn.disabled = true;
+
+            try {
+                // Firestoreにデータを保存
+                await addDoc(collection(db, "votes"), {
+                    plan: plan,
+                    timestamp: serverTimestamp(),
+                    userAgent: navigator.userAgent // 重複対策や分析用にブラウザ情報を保存
+                });
+
+                // 送信成功時の処理
+                alert('署名ありがとうございます！\n井上拓海とプロジェクトチームに通知されました。\n\n実現に向けて、ぜひSNSで友人に共有してください！');
+                btn.innerHTML = '署名完了！';
+                btn.classList.add('bg-gray-400', 'text-white');
+                btn.classList.remove('bg-yellow-400', 'text-yellow-900');
+            
+            } catch (error) {
+                console.error("Error adding document: ", error);
+                alert('送信に失敗しました。インターネット接続を確認してください。');
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
