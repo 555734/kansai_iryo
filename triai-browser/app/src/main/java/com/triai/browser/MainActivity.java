@@ -22,6 +22,8 @@ import org.mozilla.geckoview.GeckoView;
 
 public class MainActivity extends Activity {
 
+    static final String EXTRA_TEST_MODE = "com.triai.browser.TEST_MODE";
+
     private static final String[] NAMES = {"ChatGPT", "Gemini", "Claude"};
     private static final String[] URLS = {
             "https://chatgpt.com/",
@@ -41,6 +43,7 @@ public class MainActivity extends Activity {
     private final boolean[] canGoForward = new boolean[3];
 
     private int activeTab = 0;
+    private boolean testMode = false;
     private TextView statusText;
     private Button backButton;
     private Button forwardButton;
@@ -49,6 +52,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        testMode = getIntent() != null && getIntent().getBooleanExtra(EXTRA_TEST_MODE, false);
         configureSystemBars();
 
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
@@ -81,8 +85,8 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Android 15+ draws targetSdk 35+ apps edge-to-edge. The browser chrome must
-     * therefore explicitly stay outside status/navigation bars and display cutouts.
+     * Android 15+ draws targetSdk 35+ apps edge-to-edge. Keep our browser chrome
+     * outside status/navigation bars and display cutouts explicitly.
      */
     private void applySystemBarInsets(View root) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -229,7 +233,7 @@ public class MainActivity extends Activity {
             session.open(runtime);
             webViews[i].setSession(session);
             sessions[i] = session;
-            session.loadUri(URLS[i]);
+            session.loadUri(testMode ? "about:blank" : URLS[i]);
         }
     }
 
