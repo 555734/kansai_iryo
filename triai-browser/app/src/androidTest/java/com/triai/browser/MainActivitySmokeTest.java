@@ -8,10 +8,11 @@ import static androidx.test.espresso.matcher.ViewMatchers.isSelected;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.junit.Assert.assertTrue;
 
+import android.content.Intent;
 import android.content.res.Resources;
-import android.view.View;
 
 import androidx.test.core.app.ActivityScenario;
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
 import org.junit.Test;
@@ -20,9 +21,15 @@ import org.junit.runner.RunWith;
 @RunWith(AndroidJUnit4.class)
 public class MainActivitySmokeTest {
 
+    private ActivityScenario<MainActivity> launchTestActivity() {
+        Intent intent = new Intent(ApplicationProvider.getApplicationContext(), MainActivity.class);
+        intent.putExtra(MainActivity.EXTRA_TEST_MODE, true);
+        return ActivityScenario.launch(intent);
+    }
+
     @Test
     public void allThreeAiTabsExistAndCanBeSwitched() {
-        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+        try (ActivityScenario<MainActivity> scenario = launchTestActivity()) {
             onView(withText("ChatGPT")).check(matches(isDisplayed()));
             onView(withText("Gemini")).check(matches(isDisplayed()));
             onView(withText("Claude")).check(matches(isDisplayed()));
@@ -35,7 +42,7 @@ public class MainActivitySmokeTest {
 
     @Test
     public void topTabsDoNotOverlapStatusBar() {
-        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+        try (ActivityScenario<MainActivity> scenario = launchTestActivity()) {
             onView(withText("ChatGPT")).check((view, noViewFoundException) -> {
                 if (noViewFoundException != null) {
                     throw noViewFoundException;
