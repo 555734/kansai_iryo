@@ -3,10 +3,13 @@ package com.triai.browser;
 import android.app.Activity;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.graphics.Insets;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -46,6 +49,8 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        configureSystemBars();
+
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         activeTab = clampTab(prefs.getInt(PREF_ACTIVE_TAB, 0));
 
@@ -56,9 +61,42 @@ public class MainActivity extends Activity {
             runtime = GeckoRuntime.create(this, runtimeSettings);
         }
 
-        setContentView(buildUi());
+        View root = buildUi();
+        setContentView(root);
+        applySystemBarInsets(root);
+
         createBrowserSessions();
         switchTo(activeTab);
+    }
+
+    private void configureSystemBars() {
+        getWindow().setStatusBarColor(Color.WHITE);
+        getWindow().setNavigationBarColor(Color.WHITE);
+
+        int flags = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        }
+        getWindow().getDecorView().setSystemUiVisibility(flags);
+    }
+
+    /**
+     * Android 15+ draws targetSdk 35+ apps edge-to-edge. The browser chrome must
+     * therefore explicitly stay outside status/navigation bars and display cutouts.
+     */
+    private void applySystemBarInsets(View root) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            root.setOnApplyWindowInsetsListener((view, windowInsets) -> {
+                Insets insets = windowInsets.getInsets(
+                        WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout()
+                );
+                view.setPadding(insets.left, insets.top, insets.right, insets.bottom);
+                return WindowInsets.CONSUMED;
+            });
+            root.requestApplyInsets();
+        } else {
+            root.setFitsSystemWindows(true);
+        }
     }
 
     private View buildUi() {
@@ -73,7 +111,7 @@ public class MainActivity extends Activity {
         LinearLayout tabs = new LinearLayout(this);
         tabs.setOrientation(LinearLayout.HORIZONTAL);
         tabs.setGravity(Gravity.CENTER_VERTICAL);
-        tabs.setPadding(dp(8), dp(8), dp(8), dp(6));
+        tabs.setPadding(dp(7), dp(6), dp(7), dp(4));
 
         for (int i = 0; i < NAMES.length; i++) {
             final int tabIndex = i;
@@ -83,11 +121,11 @@ public class MainActivity extends Activity {
             button.setAllCaps(false);
             button.setSingleLine(true);
             button.setGravity(Gravity.CENTER);
-            button.setPadding(dp(8), 0, dp(8), 0);
+            button.setPadding(dp(6), 0, dp(6), 0);
             button.setBackgroundResource(R.drawable.tab_background);
             button.setOnClickListener(v -> switchTo(tabIndex));
 
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(42), 1f);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(40), 1f);
             params.setMargins(dp(3), 0, dp(3), 0);
             tabs.addView(button, params);
             tabButtons[i] = button;
@@ -98,10 +136,10 @@ public class MainActivity extends Activity {
         ));
 
         statusText = new TextView(this);
-        statusText.setTextSize(11);
+        statusText.setTextSize(10);
         statusText.setTextColor(Color.DKGRAY);
         statusText.setSingleLine(true);
-        statusText.setPadding(dp(14), 0, dp(14), dp(5));
+        statusText.setPadding(dp(12), 0, dp(12), dp(3));
         root.addView(statusText, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -131,7 +169,7 @@ public class MainActivity extends Activity {
         LinearLayout controls = new LinearLayout(this);
         controls.setOrientation(LinearLayout.HORIZONTAL);
         controls.setGravity(Gravity.CENTER);
-        controls.setPadding(dp(8), dp(6), dp(8), dp(8));
+        controls.setPadding(dp(7), dp(4), dp(7), dp(4));
 
         backButton = makeControlButton("←", v -> goBack());
         forwardButton = makeControlButton("→", v -> goForward());
@@ -154,7 +192,7 @@ public class MainActivity extends Activity {
     private Button makeControlButton(String label, View.OnClickListener listener) {
         Button button = new Button(this);
         button.setText(label);
-        button.setTextSize(20);
+        button.setTextSize(19);
         button.setAllCaps(false);
         button.setGravity(Gravity.CENTER);
         button.setPadding(0, 0, 0, 0);
@@ -164,7 +202,7 @@ public class MainActivity extends Activity {
     }
 
     private LinearLayout.LayoutParams controlParams() {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(42), 1f);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(40), 1f);
         params.setMargins(dp(4), 0, dp(4), 0);
         return params;
     }
