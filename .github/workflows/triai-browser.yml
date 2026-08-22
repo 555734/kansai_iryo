@@ -17,23 +17,28 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Install Gradle 8.9
+      - name: Install Gradle 8.11.1
         shell: bash
         run: |
-          curl -fsSL https://services.gradle.org/distributions/gradle-8.9-bin.zip -o /tmp/gradle.zip
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.11.1-bin.zip -o /tmp/gradle.zip
           unzip -q /tmp/gradle.zip -d /tmp
-          /tmp/gradle-8.9/bin/gradle --version
+          /tmp/gradle-8.11.1/bin/gradle --version
+      - name: Install Android API 36
+        shell: bash
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;35.0.0"
       - name: Run Gradle checks and capture diagnostics
         shell: bash
         run: |
           cd triai-browser
           mkdir -p ci-logs
           set +e
-          /tmp/gradle-8.9/bin/gradle :app:testDebugUnitTest --stacktrace > ci-logs/unit.log 2>&1
+          /tmp/gradle-8.11.1/bin/gradle :app:testDebugUnitTest --stacktrace > ci-logs/unit.log 2>&1
           echo $? > ci-logs/unit.exit
-          /tmp/gradle-8.9/bin/gradle :app:lintDebug --stacktrace > ci-logs/lint.log 2>&1
+          /tmp/gradle-8.11.1/bin/gradle :app:lintDebug --stacktrace > ci-logs/lint.log 2>&1
           echo $? > ci-logs/lint.exit
-          /tmp/gradle-8.9/bin/gradle :app:assembleDebug --stacktrace > ci-logs/build.log 2>&1
+          /tmp/gradle-8.11.1/bin/gradle :app:assembleDebug --stacktrace > ci-logs/build.log 2>&1
           echo $? > ci-logs/build.exit
           set -e
       - name: Upload diagnostics
@@ -71,10 +76,10 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Install Gradle 8.9
+      - name: Install Gradle 8.11.1
         shell: bash
         run: |
-          curl -fsSL https://services.gradle.org/distributions/gradle-8.9-bin.zip -o /tmp/gradle.zip
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.11.1-bin.zip -o /tmp/gradle.zip
           unzip -q /tmp/gradle.zip -d /tmp
       - name: Install Android emulator image
         shell: bash
@@ -82,7 +87,7 @@ jobs:
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             "platform-tools" \
-            "platforms;android-35" \
+            "platforms;android-36" \
             "build-tools;35.0.0" \
             "emulator" \
             "system-images;android-35;google_apis;x86_64"
@@ -110,7 +115,7 @@ jobs:
           cd triai-browser
           mkdir -p ci-logs
           set +e
-          /tmp/gradle-8.9/bin/gradle :app:connectedDebugAndroidTest --stacktrace > ci-logs/instrumentation.log 2>&1
+          /tmp/gradle-8.11.1/bin/gradle :app:connectedDebugAndroidTest --stacktrace > ci-logs/instrumentation.log 2>&1
           code=$?
           echo $code > ci-logs/instrumentation.exit
           "$ANDROID_HOME/platform-tools/adb" logcat -d > ci-logs/logcat.txt 2>&1 || true
