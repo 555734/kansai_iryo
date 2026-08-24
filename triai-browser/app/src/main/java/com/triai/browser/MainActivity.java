@@ -18,6 +18,9 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.viewpager2.widget.ViewPager2;
+
 import org.mozilla.geckoview.GeckoRuntime;
 import org.mozilla.geckoview.GeckoRuntimeSettings;
 import org.mozilla.geckoview.GeckoSession;
@@ -40,7 +43,7 @@ public class MainActivity extends Activity {
     private static GeckoRuntime runtime;
 
     private final GeckoSession[] sessions = new GeckoSession[3];
-    private final GeckoView[] webViews = new GeckoView[3];
+    private final GeckoView[] attachedViews = new GeckoView[3];
     private final Button[] launcherItems = new Button[3];
     private final boolean[] canGoBack = new boolean[3];
 
@@ -48,6 +51,7 @@ public class MainActivity extends Activity {
     private boolean testMode = false;
     private FrameLayout launcherOverlay;
     private Button launcherButton;
+    private ViewPager2 pager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,14 +65,16 @@ public class MainActivity extends Activity {
         if (runtime == null) {
             GeckoRuntimeSettings runtimeSettings = new GeckoRuntimeSettings.Builder()
                     .remoteDebuggingEnabled(false)
+                    .loginAutofillEnabled(true)
                     .build();
             runtime = GeckoRuntime.create(this, runtimeSettings);
         }
 
+        createBrowserSessions();
         setContentView(buildUi());
         enterImmersiveFullscreen();
-        createBrowserSessions();
-        switchTo(activeTab);
+        pager.setCurrentItem(activeTab, false);
+        updateActivePage(activeTab);
     }
 
     private void enterImmersiveFullscreen() {
@@ -111,24 +117,22 @@ public class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT
         ));
 
-        FrameLayout browserStack = new FrameLayout(this);
-        browserStack.setBackgroundColor(Color.WHITE);
-        root.addView(browserStack, new FrameLayout.LayoutParams(
+        pager = new ViewPager2(this);
+        pager.setId(R.id.ai_pager);
+        pager.setOrientation(ViewPager2.ORIENTATION_HORIZONTAL);
+        pager.setUserInputEnabled(true);
+        pager.setOffscreenPageLimit(2);
+        pager.setAdapter(new BrowserPagerAdapter());
+        pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+            @Override
+            public void onPageSelected(int position) {
+                updateActivePage(position);
+            }
+        });
+        root.addView(pager, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
         ));
-
-        for (int i = 0; i < webViews.length; i++) {
-            GeckoView view = new GeckoView(this);
-            view.setId(View.generateViewId());
-            view.setVisibility(View.GONE);
-            view.setAutofillEnabled(true);
-            browserStack.addView(view, new FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-            ));
-            webViews[i] = view;
-        }
 
         launcherOverlay = buildLauncherOverlay();
         launcherOverlay.setVisibility(View.GONE);
@@ -195,7 +199,7 @@ public class MainActivity extends Activity {
             item.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
             item.setPadding(dp(18), 0, dp(14), 0);
             item.setOnClickListener(v -> {
-                switchTo(index);
+                pager.setCurrentItem(index, true);
                 hideLauncher();
             });
 
@@ -244,20 +248,17 @@ public class MainActivity extends Activity {
                     canGoBack[index] = value;
                 }
             });
-
             session.open(runtime);
-            webViews[i].setSession(session);
             sessions[i] = session;
             session.loadUri(testMode ? "about:blank" : URLS[i]);
         }
     }
 
-    private void switchTo(int index) {
+    private void updateActivePage(int index) {
         activeTab = clampTab(index);
 
         for (int i = 0; i < sessions.length; i++) {
             boolean selected = i == activeTab;
-            webViews[i].setVisibility(selected ? View.VISIBLE : View.GONE);
             if (sessions[i] != null) {
                 sessions[i].setActive(selected);
                 sessions[i].setFocused(selected);
@@ -298,6 +299,11 @@ public class MainActivity extends Activity {
     protected void onDestroy() {
         super.onDestroy();
         if (isFinishing()) {
+            for (GeckoView view : attachedViews) {
+                if (view != null && view.getSession() != null) {
+                    view.releaseSession();
+                }
+            }
             for (GeckoSession session : sessions) {
                 if (session != null && session.isOpen()) session.close();
             }
@@ -310,5 +316,71 @@ public class MainActivity extends Activity {
 
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private final class BrowserPagerAdapter extends RecyclerView.Adapter<BrowserViewHolder> {
+
+        BrowserPagerAdapter() {
+            setHasStableIds(true);
+        }
+
+        @Override
+        public long getItemId(int position) {
+            return position;
+        }
+
+        @Override
+        public BrowserViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+            GeckoView view = new GeckoView(parent.getContext());
+            view.setLayoutParams(new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+            ));
+            view.setAutofillEnabled(true);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                view.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_YES);
+            }
+            return new BrowserViewHolder(view);
+        }
+
+        @Override
+        public void onBindViewHolder(BrowserViewHolder holder, int position) {
+            GeckoView view = holder.geckoView;
+            GeckoSession current = view.getSession();
+            if (current != null && current != sessions[position]) {
+                view.releaseSession();
+            }
+            if (view.getSession() == null) {
+                view.setSession(sessions[position]);
+            }
+            attachedViews[position] = view;
+        }
+
+        @Override
+        public void onViewRecycled(BrowserViewHolder holder) {
+            GeckoView view = holder.geckoView;
+            GeckoSession session = view.getSession();
+            if (session != null) {
+                for (int i = 0; i < attachedViews.length; i++) {
+                    if (attachedViews[i] == view) attachedViews[i] = null;
+                }
+                view.releaseSession();
+            }
+            super.onViewRecycled(holder);
+        }
+
+        @Override
+        public int getItemCount() {
+            return sessions.length;
+        }
+    }
+
+    private static final class BrowserViewHolder extends RecyclerView.ViewHolder {
+        final GeckoView geckoView;
+
+        BrowserViewHolder(GeckoView view) {
+            super(view);
+            geckoView = view;
+        }
     }
 }
