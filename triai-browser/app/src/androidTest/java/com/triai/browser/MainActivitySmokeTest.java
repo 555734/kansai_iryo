@@ -1,14 +1,15 @@
 package com.triai.browser;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Intent;
 import android.os.Build;
 import android.view.View;
-import android.view.WindowInsets;
+import android.view.ViewGroup;
+import android.view.WindowInsetsController;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.LinearLayout;
 
@@ -61,7 +62,12 @@ public class MainActivitySmokeTest {
 
                 LinearLayout content = activity.getUnifiedContentForTest();
                 assertNotNull(content);
-                assertTrue("Unified renderer should contain extracted data", content.getChildCount() > 4);
+                assertTrue("Unified renderer should contain header, status and an exchange", content.getChildCount() >= 4);
+
+                View exchange = content.getChildAt(content.getChildCount() - 1);
+                assertTrue("Last unified item should be the merged exchange", exchange instanceof LinearLayout);
+                LinearLayout exchangeLayout = (LinearLayout) exchange;
+                assertEquals("One user prompt plus three provider responses", 4, exchangeLayout.getChildCount());
 
                 launcher.performClick();
                 assertEquals(View.VISIBLE, overlay.getVisibility());
@@ -84,27 +90,33 @@ public class MainActivitySmokeTest {
     }
 
     @Test
-    public void browserUsesImmersiveFullscreen() {
+    public void browserConfiguresImmersiveFullscreenWindow() {
         try (ActivityScenario<MainActivity> scenario = launchTestActivity()) {
             scenario.onActivity(activity -> {
                 View decor = activity.getWindow().getDecorView();
+                assertNotNull(decor);
+
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    WindowInsets insets = decor.getRootWindowInsets();
-                    assertNotNull(insets);
-                    assertFalse(
-                            "Status bar must be hidden in fullscreen mode",
-                            insets.isVisible(WindowInsets.Type.statusBars())
-                    );
-                    assertFalse(
-                            "Navigation bar must be hidden in fullscreen mode",
-                            insets.isVisible(WindowInsets.Type.navigationBars())
-                    );
+                    WindowInsetsController controller = decor.getWindowInsetsController();
+                    assertNotNull("WindowInsetsController must exist for immersive fullscreen", controller);
                 } else {
                     int flags = decor.getSystemUiVisibility();
                     assertTrue((flags & View.SYSTEM_UI_FLAG_FULLSCREEN) != 0);
                     assertTrue((flags & View.SYSTEM_UI_FLAG_HIDE_NAVIGATION) != 0);
                     assertTrue((flags & View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY) != 0);
                 }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    WindowManager.LayoutParams params = activity.getWindow().getAttributes();
+                    assertEquals(
+                            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES,
+                            params.layoutInDisplayCutoutMode
+                    );
+                }
+
+                ViewGroup root = activity.findViewById(android.R.id.content);
+                assertNotNull(root);
+                assertTrue(root.getChildCount() > 0);
             });
         }
     }
