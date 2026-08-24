@@ -103,14 +103,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        if (hasFocus && launcherButton != null) {
-            enterImmersiveFullscreen();
-        }
-    }
-
     private View buildUi() {
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
@@ -239,7 +231,6 @@ public class MainActivity extends Activity {
     private void hideLauncher() {
         launcherOverlay.setVisibility(View.GONE);
         launcherButton.setVisibility(View.VISIBLE);
-        enterImmersiveFullscreen();
     }
 
     private void createBrowserSessions() {
