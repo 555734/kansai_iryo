@@ -1,18 +1,15 @@
 package com.triai.browser;
 
-import static androidx.test.espresso.Espresso.onView;
-import static androidx.test.espresso.action.ViewActions.click;
-import static androidx.test.espresso.assertion.ViewAssertions.matches;
-import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
-import static androidx.test.espresso.matcher.ViewMatchers.isSelected;
-import static androidx.test.espresso.matcher.ViewMatchers.withId;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Intent;
 import android.os.Build;
 import android.view.View;
 import android.view.WindowInsets;
+import android.widget.Button;
 
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.core.app.ApplicationProvider;
@@ -33,22 +30,42 @@ public class MainActivitySmokeTest {
     @Test
     public void launcherCanSwitchAllThreeAiSessions() {
         try (ActivityScenario<MainActivity> scenario = launchTestActivity()) {
-            onView(withId(R.id.launcher_button)).check(matches(isDisplayed())).perform(click());
-            onView(withId(R.id.launcher_chatgpt)).check(matches(isDisplayed()));
-            onView(withId(R.id.launcher_gemini)).check(matches(isDisplayed()));
-            onView(withId(R.id.launcher_claude)).check(matches(isDisplayed()));
+            scenario.onActivity(activity -> {
+                Button launcher = activity.findViewById(R.id.launcher_button);
+                View overlay = activity.findViewById(R.id.launcher_overlay);
+                Button chatgpt = activity.findViewById(R.id.launcher_chatgpt);
+                Button gemini = activity.findViewById(R.id.launcher_gemini);
+                Button claude = activity.findViewById(R.id.launcher_claude);
 
-            onView(withId(R.id.launcher_gemini)).perform(click());
-            onView(withId(R.id.launcher_button)).check(matches(isDisplayed())).perform(click());
-            onView(withId(R.id.launcher_gemini)).check(matches(isSelected()));
+                assertNotNull(launcher);
+                assertNotNull(overlay);
+                assertNotNull(chatgpt);
+                assertNotNull(gemini);
+                assertNotNull(claude);
 
-            onView(withId(R.id.launcher_claude)).perform(click());
-            onView(withId(R.id.launcher_button)).check(matches(isDisplayed())).perform(click());
-            onView(withId(R.id.launcher_claude)).check(matches(isSelected()));
+                assertEquals(View.VISIBLE, launcher.getVisibility());
+                assertEquals(View.GONE, overlay.getVisibility());
 
-            onView(withId(R.id.launcher_chatgpt)).perform(click());
-            onView(withId(R.id.launcher_button)).check(matches(isDisplayed())).perform(click());
-            onView(withId(R.id.launcher_chatgpt)).check(matches(isSelected()));
+                launcher.performClick();
+                assertEquals(View.VISIBLE, overlay.getVisibility());
+                assertEquals(View.VISIBLE, chatgpt.getVisibility());
+                assertEquals(View.VISIBLE, gemini.getVisibility());
+                assertEquals(View.VISIBLE, claude.getVisibility());
+
+                gemini.performClick();
+                assertEquals(View.GONE, overlay.getVisibility());
+                assertEquals(View.VISIBLE, launcher.getVisibility());
+                launcher.performClick();
+                assertTrue(gemini.isSelected());
+
+                claude.performClick();
+                launcher.performClick();
+                assertTrue(claude.isSelected());
+
+                chatgpt.performClick();
+                launcher.performClick();
+                assertTrue(chatgpt.isSelected());
+            });
         }
     }
 
@@ -59,7 +76,7 @@ public class MainActivitySmokeTest {
                 View decor = activity.getWindow().getDecorView();
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     WindowInsets insets = decor.getRootWindowInsets();
-                    assertTrue("WindowInsets must be available", insets != null);
+                    assertNotNull(insets);
                     assertFalse(
                             "Status bar must be hidden in fullscreen mode",
                             insets.isVisible(WindowInsets.Type.statusBars())
