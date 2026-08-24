@@ -1,9 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <item name="ai_pager" type="id" />
+    <item name="overview_container" type="id" />
+    <item name="overview_chatgpt" type="id" />
+    <item name="overview_gemini" type="id" />
+    <item name="overview_claude" type="id" />
     <item name="launcher_button" type="id" />
     <item name="launcher_overlay" type="id" />
     <item name="launcher_panel" type="id" />
+    <item name="launcher_overview" type="id" />
     <item name="launcher_chatgpt" type="id" />
     <item name="launcher_gemini" type="id" />
     <item name="launcher_claude" type="id" />
