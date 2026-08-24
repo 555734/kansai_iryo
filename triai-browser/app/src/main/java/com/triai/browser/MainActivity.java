@@ -54,7 +54,6 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
 
         testMode = getIntent() != null && getIntent().getBooleanExtra(EXTRA_TEST_MODE, false);
-        enterImmersiveFullscreen();
 
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         activeTab = clampTab(prefs.getInt(PREF_ACTIVE_TAB, 0));
@@ -67,16 +66,18 @@ public class MainActivity extends Activity {
         }
 
         setContentView(buildUi());
+        enterImmersiveFullscreen();
         createBrowserSessions();
         switchTo(activeTab);
     }
 
     private void enterImmersiveFullscreen() {
         Window window = getWindow();
+        View decor = window.getDecorView();
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.setDecorFitsSystemWindows(false);
-            WindowInsetsController controller = window.getInsetsController();
+            WindowInsetsController controller = decor.getWindowInsetsController();
             if (controller != null) {
                 controller.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
                 controller.setSystemBarsBehavior(
@@ -84,7 +85,7 @@ public class MainActivity extends Activity {
                 );
             }
         } else {
-            window.getDecorView().setSystemUiVisibility(
+            decor.setSystemUiVisibility(
                     View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
                             | View.SYSTEM_UI_FLAG_FULLSCREEN
                             | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
@@ -105,7 +106,7 @@ public class MainActivity extends Activity {
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) {
+        if (hasFocus && launcherButton != null) {
             enterImmersiveFullscreen();
         }
     }
