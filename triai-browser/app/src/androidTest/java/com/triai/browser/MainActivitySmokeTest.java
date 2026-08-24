@@ -10,6 +10,7 @@ import android.os.Build;
 import android.view.View;
 import android.view.WindowInsets;
 import android.widget.Button;
+import android.widget.LinearLayout;
 
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.core.app.ApplicationProvider;
@@ -18,7 +19,6 @@ import androidx.viewpager2.widget.ViewPager2;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mozilla.geckoview.GeckoView;
 
 @RunWith(AndroidJUnit4.class)
 public class MainActivitySmokeTest {
@@ -30,17 +30,13 @@ public class MainActivitySmokeTest {
     }
 
     @Test
-    public void pagerLauncherAndCombinedOverviewAllWork() {
+    public void pagerLauncherAndUnifiedRendererWork() {
         try (ActivityScenario<MainActivity> scenario = launchTestActivity()) {
             scenario.onActivity(activity -> {
                 ViewPager2 pager = activity.findViewById(R.id.ai_pager);
                 Button launcher = activity.findViewById(R.id.launcher_button);
                 View overlay = activity.findViewById(R.id.launcher_overlay);
-                Button overviewButton = activity.findViewById(R.id.launcher_overview);
-                View overview = activity.findViewById(R.id.overview_container);
-                GeckoView overviewChatgpt = activity.findViewById(R.id.overview_chatgpt);
-                GeckoView overviewGemini = activity.findViewById(R.id.overview_gemini);
-                GeckoView overviewClaude = activity.findViewById(R.id.overview_claude);
+                Button unified = activity.findViewById(R.id.launcher_unified);
                 Button chatgpt = activity.findViewById(R.id.launcher_chatgpt);
                 Button gemini = activity.findViewById(R.id.launcher_gemini);
                 Button claude = activity.findViewById(R.id.launcher_claude);
@@ -48,48 +44,41 @@ public class MainActivitySmokeTest {
                 assertNotNull(pager);
                 assertNotNull(launcher);
                 assertNotNull(overlay);
-                assertNotNull(overviewButton);
-                assertNotNull(overview);
-                assertNotNull(overviewChatgpt);
-                assertNotNull(overviewGemini);
-                assertNotNull(overviewClaude);
+                assertNotNull(unified);
                 assertNotNull(chatgpt);
                 assertNotNull(gemini);
                 assertNotNull(claude);
 
                 assertTrue("Horizontal page swiping must be enabled", pager.isUserInputEnabled());
                 assertEquals(ViewPager2.ORIENTATION_HORIZONTAL, pager.getOrientation());
-                assertEquals(2, pager.getOffscreenPageLimit());
-                assertEquals(View.VISIBLE, pager.getVisibility());
-                assertEquals(View.GONE, overview.getVisibility());
+                assertEquals(3, pager.getOffscreenPageLimit());
+                assertNotNull(pager.getAdapter());
+                assertEquals(4, pager.getAdapter().getItemCount());
+
+                activity.injectTestSnapshot(0, "same prompt", "GPT response");
+                activity.injectTestSnapshot(1, "same prompt", "Gemini response");
+                activity.injectTestSnapshot(2, "same prompt", "Claude response");
+
+                LinearLayout content = activity.getUnifiedContentForTest();
+                assertNotNull(content);
+                assertTrue("Unified renderer should contain extracted data", content.getChildCount() > 4);
 
                 launcher.performClick();
                 assertEquals(View.VISIBLE, overlay.getVisibility());
-                overviewButton.performClick();
-
-                assertEquals(View.GONE, pager.getVisibility());
-                assertEquals(View.VISIBLE, overview.getVisibility());
-                assertNotNull(overviewChatgpt.getSession());
-                assertNotNull(overviewGemini.getSession());
-                assertNotNull(overviewClaude.getSession());
+                unified.performClick();
+                assertEquals(3, pager.getCurrentItem());
 
                 launcher.performClick();
-                assertTrue(overviewButton.isSelected());
                 chatgpt.performClick();
-                assertEquals(View.VISIBLE, pager.getVisibility());
-                assertEquals(View.GONE, overview.getVisibility());
                 assertEquals(0, pager.getCurrentItem());
 
                 launcher.performClick();
                 gemini.performClick();
                 assertEquals(1, pager.getCurrentItem());
-                launcher.performClick();
-                assertTrue(gemini.isSelected());
 
+                launcher.performClick();
                 claude.performClick();
                 assertEquals(2, pager.getCurrentItem());
-                launcher.performClick();
-                assertTrue(claude.isSelected());
             });
         }
     }
