@@ -30,6 +30,7 @@ android {
 
 dependencies {
     implementation 'org.mozilla.geckoview:geckoview-omni:153.0.20260730155536'
+    implementation 'androidx.viewpager2:viewpager2:1.1.0'
 
     androidTestImplementation 'androidx.test:core:1.6.1'
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
