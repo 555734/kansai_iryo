@@ -271,6 +271,7 @@ public class MainActivity extends Activity {
                 sessions[i].setFocused(selected);
             }
             if (launcherItems[i] != null) {
+                launcherItems[i].setSelected(selected);
                 launcherItems[i].setText((selected ? "✓  " : "    ") + NAMES[i]);
                 launcherItems[i].setTextColor(selected ? Color.WHITE : Color.BLACK);
                 launcherItems[i].setBackground(roundRect(
