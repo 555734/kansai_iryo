@@ -5,11 +5,14 @@ import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.isSelected;
-import static androidx.test.espresso.matcher.ViewMatchers.withText;
+import static androidx.test.espresso.matcher.ViewMatchers.withId;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Intent;
-import android.content.res.Resources;
+import android.os.Build;
+import android.view.View;
+import android.view.WindowInsets;
 
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.core.app.ApplicationProvider;
@@ -28,39 +31,49 @@ public class MainActivitySmokeTest {
     }
 
     @Test
-    public void allThreeAiTabsExistAndCanBeSwitched() {
+    public void launcherCanSwitchAllThreeAiSessions() {
         try (ActivityScenario<MainActivity> scenario = launchTestActivity()) {
-            onView(withText("ChatGPT")).check(matches(isDisplayed()));
-            onView(withText("Gemini")).check(matches(isDisplayed()));
-            onView(withText("Claude")).check(matches(isDisplayed()));
+            onView(withId(R.id.launcher_button)).check(matches(isDisplayed())).perform(click());
+            onView(withId(R.id.launcher_chatgpt)).check(matches(isDisplayed()));
+            onView(withId(R.id.launcher_gemini)).check(matches(isDisplayed()));
+            onView(withId(R.id.launcher_claude)).check(matches(isDisplayed()));
 
-            onView(withText("Gemini")).perform(click()).check(matches(isSelected()));
-            onView(withText("Claude")).perform(click()).check(matches(isSelected()));
-            onView(withText("ChatGPT")).perform(click()).check(matches(isSelected()));
+            onView(withId(R.id.launcher_gemini)).perform(click());
+            onView(withId(R.id.launcher_button)).check(matches(isDisplayed())).perform(click());
+            onView(withId(R.id.launcher_gemini)).check(matches(isSelected()));
+
+            onView(withId(R.id.launcher_claude)).perform(click());
+            onView(withId(R.id.launcher_button)).check(matches(isDisplayed())).perform(click());
+            onView(withId(R.id.launcher_claude)).check(matches(isSelected()));
+
+            onView(withId(R.id.launcher_chatgpt)).perform(click());
+            onView(withId(R.id.launcher_button)).check(matches(isDisplayed())).perform(click());
+            onView(withId(R.id.launcher_chatgpt)).check(matches(isSelected()));
         }
     }
 
     @Test
-    public void topTabsDoNotOverlapStatusBar() {
+    public void browserUsesImmersiveFullscreen() {
         try (ActivityScenario<MainActivity> scenario = launchTestActivity()) {
-            onView(withText("ChatGPT")).check((view, noViewFoundException) -> {
-                if (noViewFoundException != null) {
-                    throw noViewFoundException;
+            scenario.onActivity(activity -> {
+                View decor = activity.getWindow().getDecorView();
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    WindowInsets insets = decor.getRootWindowInsets();
+                    assertTrue("WindowInsets must be available", insets != null);
+                    assertFalse(
+                            "Status bar must be hidden in fullscreen mode",
+                            insets.isVisible(WindowInsets.Type.statusBars())
+                    );
+                    assertFalse(
+                            "Navigation bar must be hidden in fullscreen mode",
+                            insets.isVisible(WindowInsets.Type.navigationBars())
+                    );
+                } else {
+                    int flags = decor.getSystemUiVisibility();
+                    assertTrue((flags & View.SYSTEM_UI_FLAG_FULLSCREEN) != 0);
+                    assertTrue((flags & View.SYSTEM_UI_FLAG_HIDE_NAVIGATION) != 0);
+                    assertTrue((flags & View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY) != 0);
                 }
-
-                int[] location = new int[2];
-                view.getLocationOnScreen(location);
-
-                Resources resources = view.getResources();
-                int resourceId = resources.getIdentifier("status_bar_height", "dimen", "android");
-                int statusBarHeight = resourceId > 0
-                        ? resources.getDimensionPixelSize(resourceId)
-                        : 0;
-
-                assertTrue(
-                        "Top AI tabs must start below the Android status bar",
-                        location[1] >= statusBarHeight
-                );
             });
         }
     }
