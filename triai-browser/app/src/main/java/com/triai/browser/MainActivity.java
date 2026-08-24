@@ -3,13 +3,16 @@ package com.triai.browser;
 import android.app.Activity;
 import android.content.SharedPreferences;
 import android.graphics.Color;
-import android.graphics.Insets;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.view.WindowInsets;
+import android.view.WindowInsetsController;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -38,22 +41,20 @@ public class MainActivity extends Activity {
 
     private final GeckoSession[] sessions = new GeckoSession[3];
     private final GeckoView[] webViews = new GeckoView[3];
-    private final Button[] tabButtons = new Button[3];
+    private final Button[] launcherItems = new Button[3];
     private final boolean[] canGoBack = new boolean[3];
-    private final boolean[] canGoForward = new boolean[3];
 
     private int activeTab = 0;
     private boolean testMode = false;
-    private TextView statusText;
-    private Button backButton;
-    private Button forwardButton;
+    private FrameLayout launcherOverlay;
+    private Button launcherButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         testMode = getIntent() != null && getIntent().getBooleanExtra(EXTRA_TEST_MODE, false);
-        configureSystemBars();
+        enterImmersiveFullscreen();
 
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         activeTab = clampTab(prefs.getInt(PREF_ACTIVE_TAB, 0));
@@ -65,98 +66,64 @@ public class MainActivity extends Activity {
             runtime = GeckoRuntime.create(this, runtimeSettings);
         }
 
-        View root = buildUi();
-        setContentView(root);
-        applySystemBarInsets(root);
-
+        setContentView(buildUi());
         createBrowserSessions();
         switchTo(activeTab);
     }
 
-    private void configureSystemBars() {
-        getWindow().setStatusBarColor(Color.WHITE);
-        getWindow().setNavigationBarColor(Color.WHITE);
+    private void enterImmersiveFullscreen() {
+        Window window = getWindow();
 
-        int flags = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(false);
+            WindowInsetsController controller = window.getInsetsController();
+            if (controller != null) {
+                controller.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
+                controller.setSystemBarsBehavior(
+                        WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                );
+            }
+        } else {
+            window.getDecorView().setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                            | View.SYSTEM_UI_FLAG_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            );
         }
-        getWindow().getDecorView().setSystemUiVisibility(flags);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            WindowManager.LayoutParams params = window.getAttributes();
+            params.layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            window.setAttributes(params);
+        }
     }
 
-    /**
-     * Android 15+ draws targetSdk 35+ apps edge-to-edge. Keep our browser chrome
-     * outside status/navigation bars and display cutouts explicitly.
-     */
-    private void applySystemBarInsets(View root) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            root.setOnApplyWindowInsetsListener((view, windowInsets) -> {
-                Insets insets = windowInsets.getInsets(
-                        WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout()
-                );
-                view.setPadding(insets.left, insets.top, insets.right, insets.bottom);
-                return WindowInsets.CONSUMED;
-            });
-            root.requestApplyInsets();
-        } else {
-            root.setFitsSystemWindows(true);
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            enterImmersiveFullscreen();
         }
     }
 
     private View buildUi() {
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.WHITE);
+        FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(Color.BLACK);
         root.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
         ));
 
-        LinearLayout tabs = new LinearLayout(this);
-        tabs.setOrientation(LinearLayout.HORIZONTAL);
-        tabs.setGravity(Gravity.CENTER_VERTICAL);
-        tabs.setPadding(dp(7), dp(6), dp(7), dp(4));
-
-        for (int i = 0; i < NAMES.length; i++) {
-            final int tabIndex = i;
-            Button button = new Button(this);
-            button.setText(NAMES[i]);
-            button.setTextSize(13);
-            button.setAllCaps(false);
-            button.setSingleLine(true);
-            button.setGravity(Gravity.CENTER);
-            button.setPadding(dp(6), 0, dp(6), 0);
-            button.setBackgroundResource(R.drawable.tab_background);
-            button.setOnClickListener(v -> switchTo(tabIndex));
-
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(40), 1f);
-            params.setMargins(dp(3), 0, dp(3), 0);
-            tabs.addView(button, params);
-            tabButtons[i] = button;
-        }
-        root.addView(tabs, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        ));
-
-        statusText = new TextView(this);
-        statusText.setTextSize(10);
-        statusText.setTextColor(Color.DKGRAY);
-        statusText.setSingleLine(true);
-        statusText.setPadding(dp(12), 0, dp(12), dp(3));
-        root.addView(statusText, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        ));
-
         FrameLayout browserStack = new FrameLayout(this);
         browserStack.setBackgroundColor(Color.WHITE);
-        LinearLayout.LayoutParams browserParams = new LinearLayout.LayoutParams(
+        root.addView(browserStack, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-        );
-        root.addView(browserStack, browserParams);
+                ViewGroup.LayoutParams.MATCH_PARENT
+        ));
 
         for (int i = 0; i < webViews.length; i++) {
             GeckoView view = new GeckoView(this);
@@ -170,45 +137,108 @@ public class MainActivity extends Activity {
             webViews[i] = view;
         }
 
-        LinearLayout controls = new LinearLayout(this);
-        controls.setOrientation(LinearLayout.HORIZONTAL);
-        controls.setGravity(Gravity.CENTER);
-        controls.setPadding(dp(7), dp(4), dp(7), dp(4));
-
-        backButton = makeControlButton("←", v -> goBack());
-        forwardButton = makeControlButton("→", v -> goForward());
-        Button reloadButton = makeControlButton("↻", v -> currentSession().reload());
-        Button homeButton = makeControlButton("⌂", v -> currentSession().loadUri(URLS[activeTab]));
-
-        controls.addView(backButton, controlParams());
-        controls.addView(forwardButton, controlParams());
-        controls.addView(reloadButton, controlParams());
-        controls.addView(homeButton, controlParams());
-
-        root.addView(controls, new LinearLayout.LayoutParams(
+        launcherOverlay = buildLauncherOverlay();
+        launcherOverlay.setVisibility(View.GONE);
+        root.addView(launcherOverlay, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
+                ViewGroup.LayoutParams.MATCH_PARENT
         ));
+
+        launcherButton = new Button(this);
+        launcherButton.setId(R.id.launcher_button);
+        launcherButton.setText("AI");
+        launcherButton.setTextColor(Color.WHITE);
+        launcherButton.setTextSize(13);
+        launcherButton.setAllCaps(false);
+        launcherButton.setPadding(0, 0, 0, 0);
+        launcherButton.setAlpha(0.82f);
+        launcherButton.setBackground(roundRect(0xE8171717, dp(24)));
+        launcherButton.setOnClickListener(v -> showLauncher());
+
+        FrameLayout.LayoutParams launcherParams = new FrameLayout.LayoutParams(dp(46), dp(46));
+        launcherParams.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
+        launcherParams.setMarginEnd(dp(8));
+        root.addView(launcherButton, launcherParams);
 
         return root;
     }
 
-    private Button makeControlButton(String label, View.OnClickListener listener) {
-        Button button = new Button(this);
-        button.setText(label);
-        button.setTextSize(19);
-        button.setAllCaps(false);
-        button.setGravity(Gravity.CENTER);
-        button.setPadding(0, 0, 0, 0);
-        button.setBackgroundResource(R.drawable.control_background);
-        button.setOnClickListener(listener);
-        return button;
+    private FrameLayout buildLauncherOverlay() {
+        FrameLayout overlay = new FrameLayout(this);
+        overlay.setId(R.id.launcher_overlay);
+        overlay.setBackgroundColor(0x7A000000);
+        overlay.setClickable(true);
+        overlay.setOnClickListener(v -> hideLauncher());
+
+        LinearLayout panel = new LinearLayout(this);
+        panel.setId(R.id.launcher_panel);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setGravity(Gravity.CENTER_HORIZONTAL);
+        panel.setPadding(dp(18), dp(16), dp(18), dp(18));
+        panel.setBackground(roundRect(0xF5FFFFFF, dp(22)));
+        panel.setClickable(true);
+        panel.setOnClickListener(v -> { });
+
+        TextView title = new TextView(this);
+        title.setText("AI Launcher");
+        title.setTextColor(Color.BLACK);
+        title.setTextSize(14);
+        title.setGravity(Gravity.CENTER);
+        title.setPadding(0, 0, 0, dp(10));
+        panel.addView(title, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
+        for (int i = 0; i < NAMES.length; i++) {
+            final int index = i;
+            Button item = new Button(this);
+            item.setId(index == 0 ? R.id.launcher_chatgpt
+                    : index == 1 ? R.id.launcher_gemini
+                    : R.id.launcher_claude);
+            item.setText(NAMES[i]);
+            item.setTextSize(16);
+            item.setAllCaps(false);
+            item.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+            item.setPadding(dp(18), 0, dp(14), 0);
+            item.setOnClickListener(v -> {
+                switchTo(index);
+                hideLauncher();
+            });
+
+            LinearLayout.LayoutParams itemParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    dp(56)
+            );
+            if (i > 0) itemParams.topMargin = dp(8);
+            panel.addView(item, itemParams);
+            launcherItems[i] = item;
+        }
+
+        FrameLayout.LayoutParams panelParams = new FrameLayout.LayoutParams(dp(276),
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        panelParams.gravity = Gravity.CENTER;
+        overlay.addView(panel, panelParams);
+
+        return overlay;
     }
 
-    private LinearLayout.LayoutParams controlParams() {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(40), 1f);
-        params.setMargins(dp(4), 0, dp(4), 0);
-        return params;
+    private GradientDrawable roundRect(int color, int radiusPx) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(radiusPx);
+        return drawable;
+    }
+
+    private void showLauncher() {
+        launcherOverlay.setVisibility(View.VISIBLE);
+        launcherButton.setVisibility(View.GONE);
+    }
+
+    private void hideLauncher() {
+        launcherOverlay.setVisibility(View.GONE);
+        launcherButton.setVisibility(View.VISIBLE);
+        enterImmersiveFullscreen();
     }
 
     private void createBrowserSessions() {
@@ -220,13 +250,6 @@ public class MainActivity extends Activity {
                 @Override
                 public void onCanGoBack(GeckoSession session, boolean value) {
                     canGoBack[index] = value;
-                    if (index == activeTab) updateNavButtons();
-                }
-
-                @Override
-                public void onCanGoForward(GeckoSession session, boolean value) {
-                    canGoForward[index] = value;
-                    if (index == activeTab) updateNavButtons();
                 }
             });
 
@@ -247,32 +270,20 @@ public class MainActivity extends Activity {
                 sessions[i].setActive(selected);
                 sessions[i].setFocused(selected);
             }
-            tabButtons[i].setSelected(selected);
-            tabButtons[i].setTextColor(selected ? Color.WHITE : Color.BLACK);
+            if (launcherItems[i] != null) {
+                launcherItems[i].setText((selected ? "✓  " : "    ") + NAMES[i]);
+                launcherItems[i].setTextColor(selected ? Color.WHITE : Color.BLACK);
+                launcherItems[i].setBackground(roundRect(
+                        selected ? 0xFF171717 : 0xFFF0F0F0,
+                        dp(16)
+                ));
+            }
         }
 
         getSharedPreferences(PREFS, MODE_PRIVATE)
                 .edit()
                 .putInt(PREF_ACTIVE_TAB, activeTab)
                 .apply();
-
-        statusText.setText(NAMES[activeTab] + "  •  open");
-        updateNavButtons();
-    }
-
-    private void updateNavButtons() {
-        backButton.setEnabled(canGoBack[activeTab]);
-        forwardButton.setEnabled(canGoForward[activeTab]);
-        backButton.setAlpha(canGoBack[activeTab] ? 1.0f : 0.35f);
-        forwardButton.setAlpha(canGoForward[activeTab] ? 1.0f : 0.35f);
-    }
-
-    private void goBack() {
-        if (canGoBack[activeTab]) currentSession().goBack();
-    }
-
-    private void goForward() {
-        if (canGoForward[activeTab]) currentSession().goForward();
     }
 
     private GeckoSession currentSession() {
@@ -281,7 +292,9 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (canGoBack[activeTab]) {
+        if (launcherOverlay != null && launcherOverlay.getVisibility() == View.VISIBLE) {
+            hideLauncher();
+        } else if (canGoBack[activeTab]) {
             currentSession().goBack();
         } else {
             super.onBackPressed();
