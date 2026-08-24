@@ -14,6 +14,7 @@ import android.widget.Button;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.viewpager2.widget.ViewPager2;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -28,41 +29,41 @@ public class MainActivitySmokeTest {
     }
 
     @Test
-    public void launcherCanSwitchAllThreeAiSessions() {
+    public void pagerIsSwipeEnabledAndLauncherControlsSamePages() {
         try (ActivityScenario<MainActivity> scenario = launchTestActivity()) {
             scenario.onActivity(activity -> {
+                ViewPager2 pager = activity.findViewById(R.id.ai_pager);
                 Button launcher = activity.findViewById(R.id.launcher_button);
                 View overlay = activity.findViewById(R.id.launcher_overlay);
                 Button chatgpt = activity.findViewById(R.id.launcher_chatgpt);
                 Button gemini = activity.findViewById(R.id.launcher_gemini);
                 Button claude = activity.findViewById(R.id.launcher_claude);
 
+                assertNotNull(pager);
                 assertNotNull(launcher);
                 assertNotNull(overlay);
                 assertNotNull(chatgpt);
                 assertNotNull(gemini);
                 assertNotNull(claude);
-
-                assertEquals(View.VISIBLE, launcher.getVisibility());
-                assertEquals(View.GONE, overlay.getVisibility());
+                assertTrue("Horizontal page swiping must be enabled", pager.isUserInputEnabled());
+                assertEquals(ViewPager2.ORIENTATION_HORIZONTAL, pager.getOrientation());
+                assertEquals(2, pager.getOffscreenPageLimit());
 
                 launcher.performClick();
                 assertEquals(View.VISIBLE, overlay.getVisibility());
-                assertEquals(View.VISIBLE, chatgpt.getVisibility());
-                assertEquals(View.VISIBLE, gemini.getVisibility());
-                assertEquals(View.VISIBLE, claude.getVisibility());
 
                 gemini.performClick();
-                assertEquals(View.GONE, overlay.getVisibility());
-                assertEquals(View.VISIBLE, launcher.getVisibility());
+                assertEquals(1, pager.getCurrentItem());
                 launcher.performClick();
                 assertTrue(gemini.isSelected());
 
                 claude.performClick();
+                assertEquals(2, pager.getCurrentItem());
                 launcher.performClick();
                 assertTrue(claude.isSelected());
 
                 chatgpt.performClick();
+                assertEquals(0, pager.getCurrentItem());
                 launcher.performClick();
                 assertTrue(chatgpt.isSelected());
             });
