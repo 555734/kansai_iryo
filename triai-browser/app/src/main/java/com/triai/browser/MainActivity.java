@@ -146,13 +146,13 @@ public class MainActivity extends Activity {
     private void installExtractorExtension() {
         runtime.getWebExtensionController()
                 .ensureBuiltIn(EXTENSION_LOCATION, EXTENSION_ID)
-                .accept(extension -> {
+                .accept(extension -> runOnUiThread(() -> {
                     for (GeckoSession session : sessions) {
                         session.getWebExtensionController()
                                 .setMessageDelegate(extension, extractorMessageDelegate, NATIVE_APP);
                     }
                     Log.i(TAG, "Unified extractor extension ready");
-                }, error -> Log.e(TAG, "Failed to install unified extractor", error));
+                }), error -> Log.e(TAG, "Failed to install unified extractor", error));
     }
 
     private View buildUi() {
@@ -322,7 +322,6 @@ public class MainActivity extends Activity {
     private void updateActivePage(int page) {
         activePage = clampPage(page);
 
-        // Keep all three sites alive so the unified extractor can continue receiving updates.
         for (int i = 0; i < sessions.length; i++) {
             GeckoSession session = sessions[i];
             if (session != null) {
