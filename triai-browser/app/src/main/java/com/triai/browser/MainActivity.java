@@ -56,6 +56,8 @@ public class MainActivity extends Activity {
 
     private static final String PREFS = "triai_prefs";
     private static final String PREF_ACTIVE_PAGE = "active_page";
+    private static final String PREF_HISTORY = "unified_history_v1";
+    private static final int HISTORY_LIMIT = 300;
     private static final String EXTENSION_LOCATION = "resource://android/assets/unified/";
     private static final String EXTENSION_ID = "triai-unified@local";
     private static final String NATIVE_APP = "triai";
@@ -67,8 +69,10 @@ public class MainActivity extends Activity {
     private final boolean[] canGoBack = new boolean[3];
     private final ProviderSnapshot[] snapshots = new ProviderSnapshot[3];
     private final Button[] launcherItems = new Button[3];
+    private final LinkedHashMap<String, HistoryItem> historyItems = new LinkedHashMap<>();
 
     private boolean testMode;
+    private boolean unifiedHistoryMode;
     private int activePage;
 
     private ViewPager2 pager;
@@ -106,6 +110,7 @@ public class MainActivity extends Activity {
         for (int i = 0; i < snapshots.length; i++) {
             snapshots[i] = new ProviderSnapshot(NAMES[i]);
         }
+        loadHistory(prefs);
 
         if (runtime == null) {
             GeckoRuntimeSettings runtimeSettings = new GeckoRuntimeSettings.Builder()
@@ -388,7 +393,102 @@ public class MainActivity extends Activity {
         }
 
         snapshots[index] = snapshot;
+        mergeHistory(index, json.optJSONArray("history"));
+        if (isConversationUrl(index, snapshot.url)) {
+            rememberHistory(index, snapshot.title, snapshot.url, snapshot.updatedAt + 1000L);
+        }
+        saveHistory();
         runOnUiThread(this::renderUnified);
+    }
+
+    private void mergeHistory(int provider, JSONArray history) {
+        if (history == null) return;
+        long now = System.currentTimeMillis();
+        for (int i = 0; i < history.length(); i++) {
+            JSONObject item = history.optJSONObject(i);
+            if (item == null) continue;
+            String title = item.optString("title", "").trim();
+            String url = item.optString("url", "").trim();
+            if (title.isEmpty() || url.isEmpty() || !isConversationUrl(provider, url)) continue;
+            rememberHistory(provider, title, url, now - i);
+        }
+    }
+
+    private void rememberHistory(int provider, String title, String url, long lastSeen) {
+        if (provider < 0 || provider >= NAMES.length || url == null || url.isEmpty()) return;
+        String key = provider + "::" + url;
+        HistoryItem existing = historyItems.get(key);
+        if (existing == null) {
+            existing = new HistoryItem(provider, title, url, lastSeen);
+            historyItems.put(key, existing);
+        } else {
+            if (title != null && !title.trim().isEmpty()) existing.title = title.trim();
+            existing.lastSeen = Math.max(existing.lastSeen, lastSeen);
+        }
+        trimHistory();
+    }
+
+    private boolean isConversationUrl(int provider, String url) {
+        if (url == null) return false;
+        String lower = url.toLowerCase(Locale.ROOT);
+        if (provider == 0) return lower.contains("/c/");
+        if (provider == 1) return lower.matches(".*gemini\\.google\\.com/app/[^/?#]+.*");
+        return lower.contains("/chat/");
+    }
+
+    private void trimHistory() {
+        while (historyItems.size() > HISTORY_LIMIT) {
+            String oldestKey = null;
+            long oldest = Long.MAX_VALUE;
+            for (Map.Entry<String, HistoryItem> entry : historyItems.entrySet()) {
+                if (entry.getValue().lastSeen < oldest) {
+                    oldest = entry.getValue().lastSeen;
+                    oldestKey = entry.getKey();
+                }
+            }
+            if (oldestKey == null) break;
+            historyItems.remove(oldestKey);
+        }
+    }
+
+    private void loadHistory(SharedPreferences prefs) {
+        String raw = prefs.getString(PREF_HISTORY, "");
+        if (raw == null || raw.isEmpty()) return;
+        try {
+            JSONArray array = new JSONArray(raw);
+            for (int i = 0; i < array.length(); i++) {
+                JSONObject item = array.optJSONObject(i);
+                if (item == null) continue;
+                int provider = item.optInt("provider", -1);
+                String title = item.optString("title", "");
+                String url = item.optString("url", "");
+                long lastSeen = item.optLong("lastSeen", 0L);
+                if (provider < 0 || provider >= NAMES.length || url.isEmpty()) continue;
+                rememberHistory(provider, title, url, lastSeen);
+            }
+        } catch (Exception error) {
+            Log.w(TAG, "Could not restore unified history", error);
+        }
+    }
+
+    private void saveHistory() {
+        try {
+            JSONArray array = new JSONArray();
+            for (HistoryItem item : historyItems.values()) {
+                JSONObject json = new JSONObject();
+                json.put("provider", item.provider);
+                json.put("title", item.title);
+                json.put("url", item.url);
+                json.put("lastSeen", item.lastSeen);
+                array.put(json);
+            }
+            getSharedPreferences(PREFS, MODE_PRIVATE)
+                    .edit()
+                    .putString(PREF_HISTORY, array.toString())
+                    .apply();
+        } catch (Exception error) {
+            Log.w(TAG, "Could not persist unified history", error);
+        }
     }
 
     private void renderUnified() {
@@ -403,11 +503,18 @@ public class MainActivity extends Activity {
         unifiedContent.addView(title);
 
         TextView subtitle = new TextView(this);
-        subtitle.setText("3つのAIサイトから現在の会話を読み取り、共通の会話UIに再構成しています。");
+        subtitle.setText("ChatGPT・Gemini・Claudeのデータを、1つのAI画面として表示します。");
         subtitle.setTextColor(0xFF666666);
         subtitle.setTextSize(13);
-        subtitle.setPadding(0, dp(4), 0, dp(14));
+        subtitle.setPadding(0, dp(4), 0, dp(10));
         unifiedContent.addView(subtitle);
+
+        addUnifiedModeTabs();
+
+        if (unifiedHistoryMode) {
+            renderUnifiedHistory();
+            return;
+        }
 
         TextView status = new TextView(this);
         status.setText(buildStatusLine());
@@ -439,6 +546,124 @@ public class MainActivity extends Activity {
 
         for (PromptGroup group : groups) {
             addPromptGroupView(group);
+        }
+    }
+
+    private void addUnifiedModeTabs() {
+        LinearLayout tabs = new LinearLayout(this);
+        tabs.setOrientation(LinearLayout.HORIZONTAL);
+        tabs.setPadding(0, 0, 0, dp(14));
+
+        Button conversation = new Button(this);
+        conversation.setId(R.id.unified_tab_conversation);
+        conversation.setText("会話");
+        conversation.setAllCaps(false);
+        conversation.setTextSize(14);
+        conversation.setOnClickListener(v -> {
+            unifiedHistoryMode = false;
+            renderUnified();
+        });
+        styleUnifiedTab(conversation, !unifiedHistoryMode);
+
+        Button history = new Button(this);
+        history.setId(R.id.unified_tab_history);
+        history.setText("履歴  " + historyItems.size());
+        history.setAllCaps(false);
+        history.setTextSize(14);
+        history.setOnClickListener(v -> {
+            unifiedHistoryMode = true;
+            renderUnified();
+        });
+        styleUnifiedTab(history, unifiedHistoryMode);
+
+        LinearLayout.LayoutParams tabParams = new LinearLayout.LayoutParams(0, dp(44), 1f);
+        tabs.addView(conversation, tabParams);
+        LinearLayout.LayoutParams historyParams = new LinearLayout.LayoutParams(0, dp(44), 1f);
+        historyParams.leftMargin = dp(8);
+        tabs.addView(history, historyParams);
+        unifiedContent.addView(tabs, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+    }
+
+    private void styleUnifiedTab(Button button, boolean selected) {
+        button.setTextColor(selected ? Color.WHITE : 0xFF333333);
+        button.setBackground(roundRect(selected ? 0xFF171717 : 0xFFE7E7E7, dp(14)));
+    }
+
+    private void renderUnifiedHistory() {
+        List<HistoryItem> items = new ArrayList<>(historyItems.values());
+        items.sort((a, b) -> Long.compare(b.lastSeen, a.lastSeen));
+
+        if (items.isEmpty()) {
+            TextView empty = new TextView(this);
+            empty.setText("履歴はまだありません。\n各AIサイトの履歴欄が読み込まれると、ここへ自動で統合されます。");
+            empty.setTextColor(0xFF555555);
+            empty.setTextSize(15);
+            empty.setGravity(Gravity.CENTER);
+            empty.setPadding(dp(20), dp(60), dp(20), dp(60));
+            unifiedContent.addView(empty);
+            return;
+        }
+
+        TextView help = new TextView(this);
+        help.setText("3サービスの履歴をまとめています。タップすると、その会話を裏で読み込んでUnified表示へ戻ります。");
+        help.setTextColor(0xFF666666);
+        help.setTextSize(12);
+        help.setPadding(0, 0, 0, dp(10));
+        unifiedContent.addView(help);
+
+        for (HistoryItem item : items) {
+            addHistoryItemView(item);
+        }
+    }
+
+    private void addHistoryItemView(HistoryItem item) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(14), dp(11), dp(14), dp(11));
+        card.setBackground(roundRect(Color.WHITE, dp(15)));
+        card.setClickable(true);
+        card.setFocusable(true);
+        card.setOnClickListener(v -> openHistoryItem(item));
+
+        TextView provider = new TextView(this);
+        provider.setText(NAMES[item.provider]);
+        provider.setTextColor(0xFF666666);
+        provider.setTextSize(11);
+        provider.setTypeface(Typeface.DEFAULT_BOLD);
+        card.addView(provider);
+
+        TextView title = new TextView(this);
+        title.setText(item.title == null || item.title.isEmpty() ? "無題の会話" : item.title);
+        title.setTextColor(0xFF181818);
+        title.setTextSize(15);
+        title.setMaxLines(2);
+        title.setPadding(0, dp(3), 0, 0);
+        card.addView(title);
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        params.bottomMargin = dp(8);
+        unifiedContent.addView(card, params);
+    }
+
+    private void openHistoryItem(HistoryItem item) {
+        if (item.provider < 0 || item.provider >= sessions.length) return;
+        rememberHistory(item.provider, item.title, item.url, System.currentTimeMillis());
+        saveHistory();
+        unifiedHistoryMode = false;
+        ProviderSnapshot loading = new ProviderSnapshot(NAMES[item.provider]);
+        loading.title = item.title;
+        loading.url = item.url;
+        snapshots[item.provider] = loading;
+        sessions[item.provider].loadUri(item.url);
+        renderUnified();
+        if (pager != null && pager.getCurrentItem() != UNIFIED_PAGE) {
+            pager.setCurrentItem(UNIFIED_PAGE, false);
         }
     }
 
@@ -590,6 +815,12 @@ public class MainActivity extends Activity {
         renderUnified();
     }
 
+    void injectTestHistory(int provider, String title, String url) {
+        int index = Math.max(0, Math.min(provider, 2));
+        rememberHistory(index, title, url, System.currentTimeMillis());
+        renderUnified();
+    }
+
     LinearLayout getUnifiedContentForTest() {
         return unifiedContent;
     }
@@ -630,6 +861,12 @@ public class MainActivity extends Activity {
     public void onBackPressed() {
         if (launcherOverlay != null && launcherOverlay.getVisibility() == View.VISIBLE) {
             hideLauncher();
+            return;
+        }
+
+        if (activePage == UNIFIED_PAGE && unifiedHistoryMode) {
+            unifiedHistoryMode = false;
+            renderUnified();
             return;
         }
 
@@ -765,6 +1002,20 @@ public class MainActivity extends Activity {
 
         ProviderSnapshot(String provider) {
             this.provider = provider;
+        }
+    }
+
+    private static final class HistoryItem {
+        final int provider;
+        String title;
+        final String url;
+        long lastSeen;
+
+        HistoryItem(int provider, String title, String url, long lastSeen) {
+            this.provider = provider;
+            this.title = title == null ? "" : title.trim();
+            this.url = url == null ? "" : url;
+            this.lastSeen = lastSeen;
         }
     }
 
