@@ -31,7 +31,7 @@ public class MainActivitySmokeTest {
     }
 
     @Test
-    public void pagerLauncherAndUnifiedRendererWork() {
+    public void pagerLauncherUnifiedRendererAndHistoryWork() {
         try (ActivityScenario<MainActivity> scenario = launchTestActivity()) {
             scenario.onActivity(activity -> {
                 ViewPager2 pager = activity.findViewById(R.id.ai_pager);
@@ -60,14 +60,30 @@ public class MainActivitySmokeTest {
                 activity.injectTestSnapshot(1, "same prompt", "Gemini response");
                 activity.injectTestSnapshot(2, "same prompt", "Claude response");
 
+                activity.injectTestHistory(0, "GPT old chat", "https://chatgpt.com/c/test-gpt");
+                activity.injectTestHistory(1, "Gemini old chat", "https://gemini.google.com/app/test-gemini");
+                activity.injectTestHistory(2, "Claude old chat", "https://claude.ai/chat/test-claude");
+
                 LinearLayout content = activity.getUnifiedContentForTest();
                 assertNotNull(content);
-                assertTrue("Unified renderer should contain header, status and an exchange", content.getChildCount() >= 4);
+                assertTrue("Unified renderer should contain header, tabs, status and an exchange", content.getChildCount() >= 5);
 
                 View exchange = content.getChildAt(content.getChildCount() - 1);
                 assertTrue("Last unified item should be the merged exchange", exchange instanceof LinearLayout);
                 LinearLayout exchangeLayout = (LinearLayout) exchange;
                 assertEquals("One user prompt plus three provider responses", 4, exchangeLayout.getChildCount());
+
+                Button historyTab = activity.findViewById(R.id.unified_tab_history);
+                assertNotNull(historyTab);
+                historyTab.performClick();
+
+                LinearLayout historyContent = activity.getUnifiedContentForTest();
+                assertTrue("Unified history should render help plus three provider conversations", historyContent.getChildCount() >= 7);
+
+                Button conversationTab = activity.findViewById(R.id.unified_tab_conversation);
+                assertNotNull(conversationTab);
+                conversationTab.performClick();
+                assertTrue(activity.getUnifiedContentForTest().getChildCount() >= 5);
 
                 launcher.performClick();
                 assertEquals(View.VISIBLE, overlay.getVisibility());
