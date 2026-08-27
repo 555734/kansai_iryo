@@ -10,4 +10,6 @@
     <item name="launcher_claude" type="id" />
     <item name="unified_page" type="id" />
     <item name="unified_content" type="id" />
+    <item name="unified_tab_conversation" type="id" />
+    <item name="unified_tab_history" type="id" />
 </resources>
