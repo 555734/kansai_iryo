@@ -105,6 +105,44 @@
     return title || provider;
   }
 
+  function historyCandidates() {
+    if (provider === "ChatGPT") {
+      return [...document.querySelectorAll('a[href^="/c/"], a[href*="chatgpt.com/c/"]')];
+    }
+    if (provider === "Gemini") {
+      return [...document.querySelectorAll('a[href^="/app/"], a[href*="gemini.google.com/app/"]')]
+        .filter((anchor) => /\/app\/[^/?#]+/.test(anchor.href || ""));
+    }
+    return [...document.querySelectorAll('a[href^="/chat/"], a[href*="/chat/"]')];
+  }
+
+  function extractHistory() {
+    const seen = new Set();
+    const result = [];
+
+    for (const anchor of historyCandidates()) {
+      const rawHref = anchor.getAttribute("href") || anchor.href || "";
+      if (!rawHref) continue;
+
+      let url;
+      try {
+        url = new URL(rawHref, location.origin).href;
+      } catch (_) {
+        continue;
+      }
+
+      if (seen.has(url)) continue;
+      const title = nodeText(anchor).split("\n")[0].trim();
+      if (!title || title.length > 300) continue;
+
+      seen.add(url);
+      result.push({ title, url });
+      if (result.length >= 120) break;
+    }
+
+    return result;
+  }
+
   function sendSnapshot() {
     timer = null;
     const messages = extractMessages().slice(-80);
@@ -113,7 +151,8 @@
       provider,
       title: conversationTitle(),
       url: location.href,
-      messages
+      messages,
+      history: extractHistory()
     };
     const serialized = JSON.stringify(payload);
     if (serialized === lastPayload) return;
